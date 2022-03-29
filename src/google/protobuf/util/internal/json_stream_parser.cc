@@ -302,14 +302,13 @@ util::Status JsonStreamParser::RunParser() {
         break;
 
       default:
-        result = util::Status(util::error::INTERNAL,
-                              StrCat("Unknown parse type: ", type));
+        result =
+            util::InternalError(StrCat("Unknown parse type: ", type));
         break;
     }
     if (!result.ok()) {
       // If we were cancelled, save our state and try again later.
-      if (!finishing_ &&
-          result == util::Status(util::error::CANCELLED, "")) {
+      if (!finishing_ && util::IsCancelled(result)) {
         stack_.push(type);
         // If we have a key we still need to render, make sure to save off the
         // contents in our own storage.
@@ -344,16 +343,16 @@ util::Status JsonStreamParser::ParseValue(TokenType type) {
     case UNKNOWN:
       return ReportUnknown("Expected a value.", ParseErrorType::EXPECTED_VALUE);
     default: {
-      if (allow_empty_null_ && IsEmptyNullAllowed(type)) {
-        return ParseEmptyNull();
-      }
-
       // Special case for having been cut off while parsing, wait for more data.
       // This handles things like 'fals' being at the end of the string, we
       // don't know if the next char would be e, completing it, or something
       // else, making it invalid.
       if (!finishing_ && p_.length() < kKeywordFalse.length()) {
-        return util::Status(util::error::CANCELLED, "");
+        return util::CancelledError("");
+      }
+
+      if (allow_empty_null_ && IsEmptyNullAllowed(type)) {
+        return ParseEmptyNull();
       }
       return ReportFailure("Unexpected token.",
                            ParseErrorType::UNEXPECTED_TOKEN);
@@ -392,7 +391,7 @@ util::Status JsonStreamParser::ParseStringHelper() {
       // depending on if we expect more data later.
       if (p_.length() == 1) {
         if (!finishing_) {
-          return util::Status(util::error::CANCELLED, "");
+          return util::CancelledError("");
         }
         return ReportFailure("Closing quote expected in string.",
                              ParseErrorType::EXPECTED_CLOSING_QUOTE);
@@ -461,7 +460,7 @@ util::Status JsonStreamParser::ParseStringHelper() {
   }
   // If we didn't find the closing quote but we expect more data, cancel for now
   if (!finishing_) {
-    return util::Status(util::error::CANCELLED, "");
+    return util::CancelledError("");
   }
   // End of string reached without a closing quote, report an error.
   string_open_ = 0;
@@ -479,14 +478,14 @@ util::Status JsonStreamParser::ParseStringHelper() {
 util::Status JsonStreamParser::ParseUnicodeEscape() {
   if (p_.length() < kUnicodeEscapedLength) {
     if (!finishing_) {
-      return util::Status(util::error::CANCELLED, "");
+      return util::CancelledError("");
     }
     return ReportFailure("Illegal hex string.",
                          ParseErrorType::ILLEGAL_HEX_STRING);
   }
   GOOGLE_DCHECK_EQ('\\', p_.data()[0]);
   GOOGLE_DCHECK_EQ('u', p_.data()[1]);
-  uint32 code = 0;
+  uint32_t code = 0;
   for (int i = 2; i < kUnicodeEscapedLength; ++i) {
     if (!isxdigit(p_.data()[i])) {
       return ReportFailure("Invalid escape sequence.",
@@ -498,7 +497,7 @@ util::Status JsonStreamParser::ParseUnicodeEscape() {
       code <= JsonEscaping::kMaxHighSurrogate) {
     if (p_.length() < 2 * kUnicodeEscapedLength) {
       if (!finishing_) {
-        return util::Status(util::error::CANCELLED, "");
+        return util::CancelledError("");
       }
       if (!coerce_to_utf8_) {
         return ReportFailure("Missing low surrogate.",
@@ -506,7 +505,7 @@ util::Status JsonStreamParser::ParseUnicodeEscape() {
       }
     } else if (p_.data()[kUnicodeEscapedLength] == '\\' &&
                p_.data()[kUnicodeEscapedLength + 1] == 'u') {
-      uint32 low_code = 0;
+      uint32_t low_code = 0;
       for (int i = kUnicodeEscapedLength + 2; i < 2 * kUnicodeEscapedLength;
            ++i) {
         if (!isxdigit(p_.data()[i])) {
@@ -612,7 +611,7 @@ util::Status JsonStreamParser::ParseNumberHelper(NumberResult* result) {
   // If the entire input is a valid number, and we may have more content in the
   // future, we abort for now and resume when we know more.
   if (index == length && !finishing_) {
-    return util::Status(util::error::CANCELLED, "");
+    return util::CancelledError("");
   }
 
   // Create a string containing just the number, so we can use safe_strtoX
@@ -627,7 +626,7 @@ util::Status JsonStreamParser::ParseNumberHelper(NumberResult* result) {
     return status;
   }
 
-  // Positive non-floating point number, parse as a uint64.
+  // Positive non-floating point number, parse as a uint64_t.
   if (!negative) {
     // Octal/Hex numbers are not valid JSON values.
     if (number.length() >= 2 && number[0] == '0') {
@@ -655,7 +654,7 @@ util::Status JsonStreamParser::ParseNumberHelper(NumberResult* result) {
         "Octal/hex numbers are not valid JSON values.",
         ParseErrorType::OCTAL_OR_HEX_ARE_NOT_VALID_JSON_VALUES);
   }
-  // Negative non-floating point number, parse as an int64.
+  // Negative non-floating point number, parse as an int64_t.
   if (safe_strto64(number, &result->int_val)) {
     result->type = NumberResult::INT;
     p_.remove_prefix(index);
@@ -799,7 +798,7 @@ util::Status JsonStreamParser::ParseArrayValue(TokenType type) {
   // empty-null array value is relying on this ARRAY_MID token.
   stack_.push(ARRAY_MID);
   util::Status result = ParseValue(type);
-  if (result == util::Status(util::error::CANCELLED, "")) {
+  if (util::IsCancelled(result)) {
     // If we were cancelled, pop back off the ARRAY_MID so we don't try to
     // push it on again when we try over.
     stack_.pop();
@@ -865,6 +864,7 @@ bool JsonStreamParser::IsEmptyNullAllowed(TokenType type) {
 
 util::Status JsonStreamParser::ReportFailure(StringPiece message,
                                              ParseErrorType parse_code) {
+  (void)parse_code;  // Parameter is used in Google-internal code.
   static const int kContextLength = 20;
   const char* p_start = p_.data();
   const char* json_start = json_.data();
@@ -874,10 +874,8 @@ util::Status JsonStreamParser::ReportFailure(StringPiece message,
   StringPiece segment(begin, end - begin);
   std::string location(p_start - begin, ' ');
   location.push_back('^');
-  auto status =
-      util::Status(util::error::INVALID_ARGUMENT,
-                   StrCat(message, "\n", segment, "\n", location));
-
+  auto status = util::InvalidArgumentError(
+      StrCat(message, "\n", segment, "\n", location));
   return status;
 }
 
@@ -885,7 +883,7 @@ util::Status JsonStreamParser::ReportUnknown(StringPiece message,
                                              ParseErrorType parse_code) {
   // If we aren't finishing the parse, cancel parsing and try later.
   if (!finishing_) {
-    return util::Status(util::error::CANCELLED, "");
+    return util::CancelledError("");
   }
   if (p_.empty()) {
     return ReportFailure(StrCat("Unexpected end of string. ", message),
@@ -897,10 +895,8 @@ util::Status JsonStreamParser::ReportUnknown(StringPiece message,
 util::Status JsonStreamParser::IncrementRecursionDepth(
     StringPiece key) const {
   if (++recursion_depth_ > max_recursion_depth_) {
-    return util::Status(
-        util::error::INVALID_ARGUMENT,
-        StrCat("Message too deep. Max recursion depth reached for key '",
-                     key, "'"));
+    return util::InvalidArgumentError(StrCat(
+        "Message too deep. Max recursion depth reached for key '", key, "'"));
   }
   return util::Status();
 }
@@ -940,7 +936,7 @@ util::Status JsonStreamParser::ParseKey() {
   // we can't know if the key was complete or not.
   if (!finishing_ && p_.empty()) {
     p_ = original;
-    return util::Status(util::error::CANCELLED, "");
+    return util::CancelledError("");
   }
   // Since we aren't using the key storage, clear it out.
   key_storage_.clear();

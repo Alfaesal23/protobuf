@@ -28,8 +28,8 @@
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-#ifndef GOOGLE_PROTOBUF_UTIL_CONVERTER_PROTOSTREAM_OBJECTSOURCE_H__
-#define GOOGLE_PROTOBUF_UTIL_CONVERTER_PROTOSTREAM_OBJECTSOURCE_H__
+#ifndef GOOGLE_PROTOBUF_UTIL_INTERNAL_PROTOSTREAM_OBJECTSOURCE_H__
+#define GOOGLE_PROTOBUF_UTIL_INTERNAL_PROTOSTREAM_OBJECTSOURCE_H__
 
 #include <cstdint>
 #include <functional>
@@ -40,16 +40,17 @@
 
 #include <google/protobuf/stubs/common.h>
 #include <google/protobuf/type.pb.h>
-#include <google/protobuf/util/internal/type_info.h>
-#include <google/protobuf/util/internal/object_source.h>
-#include <google/protobuf/util/internal/object_writer.h>
-#include <google/protobuf/util/type_resolver.h>
 #include <google/protobuf/stubs/statusor.h>
 #include <google/protobuf/stubs/strutil.h>
+#include <google/protobuf/util/internal/object_source.h>
+#include <google/protobuf/util/internal/object_writer.h>
+#include <google/protobuf/util/internal/type_info.h>
+#include <google/protobuf/util/type_resolver.h>
 #include <google/protobuf/stubs/hash.h>
 #include <google/protobuf/stubs/status.h>
 
 
+// Must be included last.
 #include <google/protobuf/port_def.inc>
 
 namespace google {
@@ -287,7 +288,7 @@ class PROTOBUF_EXPORT ProtoStreamObjectSource : public ObjectSource {
       const google::protobuf::Type& type) const;
 
   // Helper function to check recursion depth and increment it. It will return
-  // Status::OK if the current depth is allowed. Otherwise an error is returned.
+  // OkStatus() if the current depth is allowed. Otherwise an error is returned.
   // type_name and field_name are used for error reporting.
   util::Status IncrementRecursionDepth(StringPiece type_name,
                                        StringPiece field_name) const;
@@ -325,4 +326,4 @@ class PROTOBUF_EXPORT ProtoStreamObjectSource : public ObjectSource {
 
 #include <google/protobuf/port_undef.inc>
 
-#endif  // GOOGLE_PROTOBUF_UTIL_CONVERTER_PROTOSTREAM_OBJECTSOURCE_H__
+#endif  // GOOGLE_PROTOBUF_UTIL_INTERNAL_PROTOSTREAM_OBJECTSOURCE_H__

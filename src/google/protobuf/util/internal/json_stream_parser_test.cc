@@ -35,9 +35,9 @@
 #include <google/protobuf/stubs/logging.h>
 #include <google/protobuf/stubs/common.h>
 #include <google/protobuf/util/internal/expecting_objectwriter.h>
-#include <google/protobuf/util/internal/object_writer.h>
 #include <gtest/gtest.h>
 #include <google/protobuf/stubs/time.h>
+#include <google/protobuf/util/internal/object_writer.h>
 #include <google/protobuf/stubs/status.h>
 
 
@@ -85,7 +85,7 @@ using ParseErrorType =
 class JsonStreamParserTest : public ::testing::Test {
  protected:
   JsonStreamParserTest() : mock_(), ow_(&mock_) {}
-  virtual ~JsonStreamParserTest() {}
+  ~JsonStreamParserTest() override {}
 
   util::Status RunTest(StringPiece json, int split,
                        std::function<void(JsonStreamParser*)> setup) {
@@ -138,7 +138,7 @@ class JsonStreamParserTest : public ::testing::Test {
       std::function<void(JsonStreamParser*)> setup = [](JsonStreamParser* p) {
       }) {
     util::Status result = RunTest(json, split, setup);
-    EXPECT_EQ(util::error::INVALID_ARGUMENT, result.code());
+    EXPECT_TRUE(util::IsInvalidArgument(result));
     StringPiece error_message(result.message());
     EXPECT_EQ(error_prefix, error_message.substr(0, error_prefix.size()));
   }
@@ -149,7 +149,7 @@ class JsonStreamParserTest : public ::testing::Test {
       std::function<void(JsonStreamParser*)> setup = [](JsonStreamParser* p) {
       }) {
     util::Status result = RunTest(json, split, setup);
-    EXPECT_EQ(util::error::INVALID_ARGUMENT, result.code());
+    EXPECT_TRUE(util::IsInvalidArgument(result));
     StringPiece error_message(result.message());
     EXPECT_EQ(error_prefix, error_message.substr(0, error_prefix.size()));
   }

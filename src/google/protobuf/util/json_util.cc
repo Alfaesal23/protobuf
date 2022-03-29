@@ -31,9 +31,12 @@
 #include <google/protobuf/util/json_util.h>
 
 #include <google/protobuf/stubs/common.h>
+#include <google/protobuf/stubs/once.h>
+#include <google/protobuf/stubs/status.h>
+#include <google/protobuf/stubs/bytestream.h>
+#include <google/protobuf/stubs/strutil.h>
 #include <google/protobuf/io/coded_stream.h>
 #include <google/protobuf/io/zero_copy_stream.h>
-#include <google/protobuf/stubs/once.h>
 #include <google/protobuf/util/internal/default_value_objectwriter.h>
 #include <google/protobuf/util/internal/error_listener.h>
 #include <google/protobuf/util/internal/json_objectwriter.h>
@@ -42,9 +45,6 @@
 #include <google/protobuf/util/internal/protostream_objectwriter.h>
 #include <google/protobuf/util/type_resolver.h>
 #include <google/protobuf/util/type_resolver_util.h>
-#include <google/protobuf/stubs/bytestream.h>
-#include <google/protobuf/stubs/status.h>
-#include <google/protobuf/stubs/strutil.h>
 #include <google/protobuf/stubs/status_macros.h>
 
 // clang-format off
@@ -64,7 +64,7 @@ ZeroCopyStreamByteSink::~ZeroCopyStreamByteSink() {
 
 void ZeroCopyStreamByteSink::Append(const char* bytes, size_t len) {
   while (true) {
-    if (len <= buffer_size_) {
+    if (len <= buffer_size_) {  // NOLINT
       memcpy(buffer_, bytes, len);
       buffer_ = static_cast<char*>(buffer_) + len;
       buffer_size_ -= len;
@@ -140,25 +140,22 @@ class StatusErrorListener : public converter::ErrorListener {
     if (!loc_string.empty()) {
       loc_string.append(" ");
     }
-    status_ =
-        util::Status(util::error::INVALID_ARGUMENT,
-                     StrCat(loc_string, unknown_name, ": ", message));
+    status_ = util::InvalidArgumentError(
+        StrCat(loc_string, unknown_name, ": ", message));
   }
 
   void InvalidValue(const converter::LocationTrackerInterface& loc,
                     StringPiece type_name,
                     StringPiece value) override {
-    status_ = util::Status(
-        util::error::INVALID_ARGUMENT,
+    status_ = util::InvalidArgumentError(
         StrCat(GetLocString(loc), ": invalid value ", std::string(value),
                      " for type ", std::string(type_name)));
   }
 
   void MissingField(const converter::LocationTrackerInterface& loc,
                     StringPiece missing_name) override {
-    status_ = util::Status(util::error::INVALID_ARGUMENT,
-                           StrCat(GetLocString(loc), ": missing field ",
-                                        std::string(missing_name)));
+    status_ = util::InvalidArgumentError(StrCat(
+        GetLocString(loc), ": missing field ", std::string(missing_name)));
   }
 
  private:
@@ -221,7 +218,7 @@ util::Status JsonToBinaryString(TypeResolver* resolver,
 
 namespace {
 const char* kTypeUrlPrefix = "type.googleapis.com";
-TypeResolver* generated_type_resolver_ = NULL;
+TypeResolver* generated_type_resolver_ = nullptr;
 PROTOBUF_NAMESPACE_ID::internal::once_flag generated_type_resolver_init_;
 
 std::string GetTypeUrl(const Message& message) {
@@ -229,7 +226,9 @@ std::string GetTypeUrl(const Message& message) {
          message.GetDescriptor()->full_name();
 }
 
-void DeleteGeneratedTypeResolver() { delete generated_type_resolver_; }
+void DeleteGeneratedTypeResolver() {  // NOLINT
+  delete generated_type_resolver_;
+}
 
 void InitGeneratedTypeResolver() {
   generated_type_resolver_ = NewTypeResolverForDescriptorPool(
@@ -271,8 +270,8 @@ util::Status JsonStringToMessage(StringPiece input, Message* message,
   util::Status result = JsonToBinaryString(resolver, GetTypeUrl(*message),
                                            input, &binary, options);
   if (result.ok() && !message->ParseFromString(binary)) {
-    result = util::Status(util::error::INVALID_ARGUMENT,
-                          "JSON transcoder produced invalid protobuf output.");
+    result = util::InvalidArgumentError(
+        "JSON transcoder produced invalid protobuf output.");
   }
   if (pool != DescriptorPool::generated_pool()) {
     delete resolver;

@@ -46,11 +46,11 @@
 #include <google/protobuf/util/internal/testdata/proto3.pb.h>
 #include <google/protobuf/util/internal/testdata/struct.pb.h>
 #include <google/protobuf/util/internal/testdata/timestamp_duration.pb.h>
-#include <google/protobuf/util/internal/type_info_test_helper.h>
-#include <google/protobuf/util/internal/constants.h>
 #include <gtest/gtest.h>
 #include <google/protobuf/stubs/casts.h>
 #include <google/protobuf/stubs/status.h>
+#include <google/protobuf/util/internal/constants.h>
+#include <google/protobuf/util/internal/type_info_test_helper.h>
 
 
 namespace google {
@@ -103,7 +103,7 @@ class ProtostreamObjectSourceTest
     helper_.ResetTypeInfo(Book::descriptor(), Proto3Message::descriptor());
   }
 
-  virtual ~ProtostreamObjectSourceTest() {}
+  ~ProtostreamObjectSourceTest() override {}
 
   void DoTest(const Message& msg, const Descriptor* descriptor) {
     util::Status status = ExecuteTest(msg, descriptor);
@@ -597,7 +597,7 @@ TEST_P(ProtostreamObjectSourceTest, CyclicMessageDepthTest) {
   }
 
   util::Status status = ExecuteTest(cyclic, Cyclic::descriptor());
-  EXPECT_EQ(util::error::INVALID_ARGUMENT, status.code());
+  EXPECT_TRUE(util::IsInvalidArgument(status));
 }
 
 class ProtostreamObjectSourceMapsTest : public ProtostreamObjectSourceTest {
@@ -943,7 +943,7 @@ TEST_P(ProtostreamObjectSourceAnysTest, MissingTypeUrlError) {
   ow_.StartObject("");
 
   util::Status status = ExecuteTest(out, AnyOut::descriptor());
-  EXPECT_EQ(util::error::INTERNAL, status.code());
+  EXPECT_TRUE(util::IsInternal(status));
 }
 
 TEST_P(ProtostreamObjectSourceAnysTest, UnknownTypeServiceError) {
@@ -959,7 +959,7 @@ TEST_P(ProtostreamObjectSourceAnysTest, UnknownTypeServiceError) {
   ow_.StartObject("");
 
   util::Status status = ExecuteTest(out, AnyOut::descriptor());
-  EXPECT_EQ(util::error::INTERNAL, status.code());
+  EXPECT_TRUE(util::IsInternal(status));
 }
 
 TEST_P(ProtostreamObjectSourceAnysTest, UnknownTypeError) {
@@ -975,7 +975,7 @@ TEST_P(ProtostreamObjectSourceAnysTest, UnknownTypeError) {
   ow_.StartObject("");
 
   util::Status status = ExecuteTest(out, AnyOut::descriptor());
-  EXPECT_EQ(util::error::INTERNAL, status.code());
+  EXPECT_TRUE(util::IsInternal(status));
 }
 
 class ProtostreamObjectSourceStructTest : public ProtostreamObjectSourceTest {
@@ -1108,7 +1108,7 @@ TEST_P(ProtostreamObjectSourceTimestampTest, InvalidTimestampBelowMinTest) {
   ow_.StartObject("");
 
   util::Status status = ExecuteTest(out, TimestampDuration::descriptor());
-  EXPECT_EQ(util::error::INTERNAL, status.code());
+  EXPECT_TRUE(util::IsInternal(status));
 }
 
 TEST_P(ProtostreamObjectSourceTimestampTest, InvalidTimestampAboveMaxTest) {
@@ -1119,7 +1119,7 @@ TEST_P(ProtostreamObjectSourceTimestampTest, InvalidTimestampAboveMaxTest) {
   ow_.StartObject("");
 
   util::Status status = ExecuteTest(out, TimestampDuration::descriptor());
-  EXPECT_EQ(util::error::INTERNAL, status.code());
+  EXPECT_TRUE(util::IsInternal(status));
 }
 
 TEST_P(ProtostreamObjectSourceTimestampTest, InvalidDurationBelowMinTest) {
@@ -1130,7 +1130,7 @@ TEST_P(ProtostreamObjectSourceTimestampTest, InvalidDurationBelowMinTest) {
   ow_.StartObject("");
 
   util::Status status = ExecuteTest(out, TimestampDuration::descriptor());
-  EXPECT_EQ(util::error::INTERNAL, status.code());
+  EXPECT_TRUE(util::IsInternal(status));
 }
 
 TEST_P(ProtostreamObjectSourceTimestampTest, InvalidDurationAboveMaxTest) {
@@ -1141,7 +1141,7 @@ TEST_P(ProtostreamObjectSourceTimestampTest, InvalidDurationAboveMaxTest) {
   ow_.StartObject("");
 
   util::Status status = ExecuteTest(out, TimestampDuration::descriptor());
-  EXPECT_EQ(util::error::INTERNAL, status.code());
+  EXPECT_TRUE(util::IsInternal(status));
 }
 
 TEST_P(ProtostreamObjectSourceTimestampTest, TimestampDurationDefaultValue) {
